@@ -1,3 +1,10 @@
+
+
+
+
+
+
+
 class Word2Vec(utils.SaveLoad):
     """
     Class for training, using and evaluating neural networks described in https://code.google.com/p/word2vec/
@@ -44,8 +51,12 @@ class Word2Vec(utils.SaveLoad):
             self.train(sentences)
 
     def initialize_word_vectors(self):
+        #word
         self.wv = KeyedVectors()
+        #category
+        self.cv = KeyedVectors()
 
+    #same as word2vec
     def make_cum_table(self, power=0.75, domain=2**31 - 1):
         """
         Create a cumulative-distribution table using stored vocabulary word counts for
@@ -78,37 +89,47 @@ class Word2Vec(utils.SaveLoad):
         self.scale_vocab(keep_raw_vocab=keep_raw_vocab, trim_rule=trim_rule, update=update)  # trim by min_count & precalculate downsampling
         self.finalize_vocab(update=update)  # build tables & arrays
 
-    def scan_vocab(self, sentences, progress_per=10000, trim_rule=None):
-        """Do an initial scan of all words appearing in sentences."""
-        logger.info("collecting all words and their counts")
-        sentence_no = -1
+    #article = ([categories], sentence)
+    def scan_vocab(self, articles, progress_per=10000, trim_rule=None):
+        """Do an initial scan of all words appearing in articles."""
+        logger.info("collecting all categories, words and their counts")
+        article_no = -1
         total_words = 0
-        min_reduce = 1
-        vocab = defaultdict(int)
+        total_categories = 0
+        word_vocab = defaultdict(int)
+        category_vocab = defaultdict(int)
         checked_string_types = 0
-        for sentence_no, sentence in enumerate(sentences):
+        for article_no, article in enumerate(articles):
+            categories = article[0] #list
+            sentence = article[1] #string
             if not checked_string_types:
                 if isinstance(sentence, string_types):
                     logger.warn("Each 'sentences' item should be a list of words (usually unicode strings)."
                                 "First item here is instead plain %s.", type(sentence))
                 checked_string_types += 1
             if sentence_no % progress_per == 0:
-                logger.info("PROGRESS: at sentence #%i, processed %i words, keeping %i word types",
-                            sentence_no, sum(itervalues(vocab)) + total_words, len(vocab))
+                logger.info("PROGRESS: at article #%i, processed %i categories, keeping %i category types, %i words, keeping %i word types",
+                            article_no, sum(itervalues(category_vocab)) + total_categories, len(category_vocab), sum(itervalues(word_vocab)) + total_words, len(word_vocab))
+
+            for category in categories:
+                category_vocab[category] += 1
             for word in sentence:
-                vocab[word] += 1
+                word_vocab[word] += 1
 
             if self.max_vocab_size and len(vocab) > self.max_vocab_size:
                 total_words += utils.prune_vocab(vocab, min_reduce, trim_rule=trim_rule)
                 min_reduce += 1
 
-        total_words += sum(itervalues(vocab))
-        logger.info("collected %i word types from a corpus of %i raw words and %i sentences",
-                    len(vocab), total_words, sentence_no + 1)
-        self.corpus_count = sentence_no + 1
-        self.raw_vocab = vocab
+        total_categories += sum(itervalues(category_vocab))
+        total_words += sum(itervalues(word_vocab))
 
-    def scale_vocab(self, min_count=None, sample=None, dry_run=False, keep_raw_vocab=False, trim_rule=None, update=False):
+        logger.info("collected %i word types from a corpus of %i raw words and %i articles",
+                    len(word_vocab), total_words, article_no + 1)
+        self.corpus_count = article_no + 1
+        self.raw_category_vocab = category_vocab
+        self.raw_word_vocab = word_vocab
+
+    def scale_vocab(self, min_count=None):
         """
         Apply vocabulary settings for `min_count` (discarding less-frequent words)
         and `sample` (controlling the downsampling of more-frequent words).
@@ -120,67 +141,65 @@ class Word2Vec(utils.SaveLoad):
         unless `keep_raw_vocab` is set.
         """
         min_count = min_count or self.min_count
-        sample = sample or self.sample
-        drop_total = drop_unique = 0
+        drop_ctotal = drop_cunique = 0
+        drop_wtotal = drop_wunique = 0
 
-        if not update:
-            logger.info("Loading a fresh vocabulary")
-            retain_total, retain_words = 0, []
-            # Discard words less-frequent than min_count
-            if not dry_run:
-                self.wv.index2word = []
-                # make stored settings match these applied settings
-                self.min_count = min_count
-                self.sample = sample
-                self.wv.vocab = {}
+        logger.info("Loading a fresh vocabulary")
+        retain_ctotal, retain_categories = 0, []
+        retain_wtotal, retain_words = 0, []
+        # Discard words less-frequent than min_count
+        if not dry_run:
+            self.cv.index2word = []
+            self.wv.index2word = []
+            # make stored settings match these applied settings
+            self.min_count = min_count
+            self.sample = sample
 
-            for word, v in iteritems(self.raw_vocab):
-                if keep_vocab_item(word, v, min_count, trim_rule=trim_rule):
-                    retain_words.append(word)
-                    retain_total += v
-                    if not dry_run:
-                        self.wv.vocab[word] = Vocab(count=v, index=len(self.wv.index2word))
-                        self.wv.index2word.append(word)
-                else:
-                    drop_unique += 1
-                    drop_total += v
-            original_unique_total = len(retain_words) + drop_unique
-            retain_unique_pct = len(retain_words) * 100 / max(original_unique_total, 1)
-            logger.info("min_count=%d retains %i unique words (%i%% of original %i, drops %i)",
-                        min_count, len(retain_words), retain_unique_pct, original_unique_total, drop_unique)
-            original_total = retain_total + drop_total
-            retain_pct = retain_total * 100 / max(original_total, 1)
-            logger.info("min_count=%d leaves %i word corpus (%i%% of original %i, drops %i)",
-                        min_count, retain_total, retain_pct, original_total, drop_total)
-        else:
-            logger.info("Updating model with new vocabulary")
-            new_total = pre_exist_total = 0
-            new_words = pre_exist_words = []
-            for word, v in iteritems(self.raw_vocab):
-                if keep_vocab_item(word, v, min_count, trim_rule=trim_rule):
-                    if word in self.wv.vocab:
-                        pre_exist_words.append(word)
-                        pre_exist_total += v
-                        if not dry_run:
-                            self.wv.vocab[word].count += v
-                    else:
-                        new_words.append(word)
-                        new_total += v
-                        if not dry_run:
-                            self.wv.vocab[word] = Vocab(count=v, index=len(self.wv.index2word))
-                            self.wv.index2word.append(word)
-                else:
-                    drop_unique += 1
-                    drop_total += v
-            original_unique_total = len(pre_exist_words) + len(new_words) + drop_unique
-            pre_exist_unique_pct = len(pre_exist_words) * 100 / max(original_unique_total, 1)
-            new_unique_pct = len(new_words) * 100 / max(original_unique_total, 1)
-            logger.info("""New added %i unique words (%i%% of original %i)
-                        and increased the count of %i pre-existing words (%i%% of original %i)""",
-                        len(new_words), new_unique_pct, original_unique_total,
-                        len(pre_exist_words), pre_exist_unique_pct, original_unique_total)
-            retain_words = new_words + pre_exist_words
-            retain_total = new_total + pre_exist_total
+            self.cv.vocab = {}
+            self.wv.vocab = {}
+
+        for category, v in iteritems(self.raw_category_vocab):
+            if keep_vocab_item(category, v, min_count, trim_rule=trim_rule):
+                retain_categories.append(category)
+                retain_ctotal += v
+                if not dry_run:
+                    self.cv.vocab[category] = Vocab(count=v, index=len(self.cv.index2word))
+                    self.cv.index2word.append(category)
+            else:
+                drop_cunique += 1
+                drop_ctotal += v
+
+        for word, v in iteritems(self.raw_word_vocab):
+            if keep_vocab_item(word, v, min_count, trim_rule=trim_rule):
+                retain_words.append(word)
+                retain_wtotal += v
+                if not dry_run:
+                    self.wv.vocab[word] = Vocab(count=v, index=len(self.wv.index2word))
+                    self.wv.index2word.append(word)
+            else:
+                drop_wunique += 1
+                drop_wtotal += v
+
+        original_cunique_total = len(retain_categories) + drop_cunique
+        original_wunique_total = len(retain_words) + drop_wunique
+
+        retain_cunique_pct = len(retain_words) * 100 / max(original_cunique_total, 1)
+        retain_wunique_pct = len(retain_words) * 100 / max(original_wunique_total, 1)
+
+        logger.info("min_count=%d retains %i unique categories (%i%% of original %i, drops %i)",
+                    min_count, len(retain_categories), retain_cunique_pct, original_cunique_total, drop_cunique)
+        logger.info("min_count=%d retains %i unique words (%i%% of original %i, drops %i)",
+                    min_count, len(retain_words), retain_wunique_pct, original_wunique_total, drop_wunique)
+
+        original_ctotal = retain_ctotal + drop_ctotal
+        original_wtotal = retain_wtotal + drop_wtotal
+        retain_cpct = retain_ctotal * 100 / max(original_ctotal, 1)
+        retain_wpct = retain_wtotal * 100 / max(original_wtotal, 1)
+        logger.info("min_count=%d leaves %i word corpus (%i%% of original %i, drops %i)",
+                    min_count, retain_ctotal, retain_cpct, original_ctotal, drop_ctotal)
+        logger.info("min_count=%d leaves %i word corpus (%i%% of original %i, drops %i)",
+                    min_count, retain_wtotal, retain_wpct, original_wtotal, drop_wtotal)
+
 
         # Precalculate each vocabulary item's threshold for sampling
         if not sample:
