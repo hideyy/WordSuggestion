@@ -1,0 +1,83 @@
+{% extends "layout.html" %}
+{% block content %}
+  <!-- Form
+  ================================================== -->
+<div class="form">
+  <div class="container">
+	<div class="page-header">
+		<h1>Multilingual word suggestion system</h1>
+		<p class="lead">Suggest translation words in different languages.</p>
+	</div>
+	<div class="row">
+		<div class="col-md-12">
+		<form action="/post" method="post" class="form-horizontal">
+			<div class="form-group">
+				<label class="control-label col-xs-2">Input word</label>
+				<div class="col-xs-3">
+					<input type="text" class="form-control" id="word_in" name="word_in" placeholder="word">
+				</div>
+				<label class="col-xs-2 control-label">Input Language</label>
+				<div class="col-xs-3">
+					<select name="lang_in" class="form-control selectContainer" >
+						<option value="eng">English</option>
+						<option value="fra">French</option>
+						<option value="jpn">Japanese</option>
+						<option value="cmn">Chinese</option>
+						<option value="spa">Spanish</option>
+						<option value="ita">Italy</option>
+						<option value="por">Portgual</option>
+						<option value="swe">Swedish</option>
+					</select>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label class="col-xs-2 control-label">Part of Speech</label>
+				<div class="col-xs-3">
+					<select name="pos" class="form-control selectContainer" >
+						<option value="x">all</option>
+						<option value="a">Adjective</option>
+						<option value="n">Noun</option>
+						<option value="v">Verb</option>
+					</select>
+				</div>
+				<label class="col-xs-2 control-label">Output Language</label>
+				<div class="col-xs-3">
+					<select name="lang_out" class="form-control selectContainer" >
+						<option value="eng">English</option>
+						<option value="fra">French</option>
+						<option value="jpn">Japanese</option>
+						<option value="cmn">Chinese</option>
+						<option value="spa">Spanish</option>
+						<option value="ita">Italy</option>
+						<option value="por">Portgual</option>
+						<option value="swe">Swedish</option>
+					</select>
+				</div>
+				
+			</div>
+			<div class="form-group">
+				<div class="col-xs-offset-2 col-xs-10">
+					<button type="submit"  name="action" value="synset" class="btn btn-default">Search</button>
+				</div>
+			</div>
+		</form>
+		</div>
+	</div>
+  </div>
+</div>
+
+
+
+{% endblock %}
+
+<!--
+        <p class="lead">
+          {% if name %}
+			こんにちは {{ name }} さん
+          {% else %}
+            
+          {% endif %}
+		  
+        </p>
+-->

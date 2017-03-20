@@ -1,0 +1,10 @@
+#templates/report.html
+<!DOCTYPE html>
+<html>
+    <body>
+        <h1>My Great Report</h1>
+        #This is the only fancy part… we're clearing the html
+		#from the to_html() method
+        {{ df|safe }}
+    </body>
+</html>
