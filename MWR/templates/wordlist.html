@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+{% block content %}
+  <!-- Form
+  ================================================== -->
+<div class="form">
+  <div class="container">
+	<div class="page-header">
+		<h1>Multilingual word suggestion system</h1>
+		<p class="lead">Suggest translation words in different languages.</p>
+	</div>
+	
+	{% if sgwords %}
+	<div class="row">
+		<div class="col-md-12">
+			<h3>{{lang_out}} words suggested to translate form "{{word_in}}" in {{lang_in}} </h3>
+			
+			{% autoescape false %}
+			{{sgwords}}
+			{% endautoescape %}
+			
+<!-- 			<form action="/" class="form-horizontal">
+			<div class="form-group">
+				<div class="col-xs-offset-0 col-xs-12">
+					<button type="submit" value="Go back" class="btn btn-default">Go back</button>
+				</div>
+			</div>
+			</form> -->
+		
+		</div>
+	</div>
+	{% endif %}
+  </div>
+</div>
+{% endblock %}
+
+<!--
+        <p class="lead">
+          {% if name %}
+			こんにちは {{ name }} さん
+          {% else %}
+            
+          {% endif %}
+		  
+        </p>
+-->
